@@ -1,49 +1,61 @@
-
+/// <reference types="vite/client" />
 import { GoogleGenAI } from "@google/genai";
-import { APF_DATASET } from "../constants/apfData";
-
-const DATASET_STRING = JSON.stringify(APF_DATASET, null, 2);
-
-const SYSTEM_INSTRUCTION = `
-You are the "APF Safety Assistant," a dedicated helper for the Active Pregnancy Foundation. 
-Your goal is to accurately answer queries about physical activity during pregnancy using ONLY the provided APF Dataset, which includes the full GAQ-P (Get Active Questionnaire for Pregnancy).
-
-CORE GUIDELINES:
-1. DATA FIDELITY: Only use information from the dataset provided below. Do not provide medical advice not present in this data.
-2. GAQ-P SCREENING: You have access to the 13 core screening questions (GAQP-01-A through M). If a user asks about screening, you can list these requirements.
-3. CITATIONS: When you answer, mention which part of the data you are referring to if possible (e.g., "Based on the GAQ-P screening question regarding...").
-4. SAFETY FIRST: If a user mentions red flag symptoms like dizziness, chest pain, contractions, bleeding, or leakage, immediately prioritize the "SAFETY-STOP" record instructions.
-5. UNKNOWN QUERIES: If the dataset does not contain an answer, politely say: "I'm sorry, but my current records don't contain information on that. Please consult a healthcare professional for specific medical advice."
-6. TONE: Professional, supportive, and clear.
-
-DATASET:
-${DATASET_STRING}
-`;
+import { retrieveContext } from "./ragService";
 
 export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
 }
 
-export const getGeminiResponse = async (history: ChatMessage[]) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY || '' });
+const SYSTEM_INSTRUCTION = `
+You are the APF Safety Assistant — a specialized assistant for pre-activity screening 
+and physical activity safety during pregnancy.
+
+STRICT RULES:
+1. You ONLY answer using the CONTEXT provided below each question. 
+2. If the context does not contain enough information to answer, say: 
+   "I don't have specific information on that in my database. Please consult your healthcare provider."
+3. Do NOT use any outside knowledge. Do NOT make things up.
+4. Be clear, concise, and clinically accurate.
+5. Always recommend consulting a healthcare provider for personal medical decisions.
+6. Cite your source at the end of each answer in parentheses, e.g. (Source: GAQ-P Guidelines Document).
+`;
+
+export const getGeminiResponse = async (history: ChatMessage[]): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' });
+  const lastUserMessage = [...history].reverse().find(m => m.role === 'user');
+  if (!lastUserMessage) return "Please ask a question.";
+  const contexts = await retrieveContext(lastUserMessage.text, 5);
   
+  const contextBlock = contexts
+    .map((c, i) => `[${i + 1}] (${c.sourceLabel})\n${c.text}`)
+    .join('\n\n');
+  const augmentedHistory = history.map((m, idx) => {
+    if (idx === history.length - 1 && m.role === 'user') {
+      return {
+        ...m,
+        text: `CONTEXT FROM DATABASE:\n${contextBlock}\n\nUSER QUESTION: ${m.text}`
+      };
+    }
+    return m;
+  });
+
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: history.map(m => ({
+      model: 'gemini-2.0-flash',
+      contents: augmentedHistory.map(m => ({
         role: m.role,
         parts: [{ text: m.text }]
       })),
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.2, // Low temperature for high accuracy
+        temperature: 0.1,
       },
     });
 
     return response.text || "I'm having trouble retrieving that information right now. Please try again.";
   } catch (error) {
-    console.error("Gemini Assistant Error:", error);
+    console.error("Gemini Error:", error);
     return "I encountered a technical error. Please check your connection and try again.";
   }
 };
