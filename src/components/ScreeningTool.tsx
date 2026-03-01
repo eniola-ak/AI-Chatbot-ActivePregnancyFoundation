@@ -1,12 +1,11 @@
-
 import React, { useState } from 'react';
-import { APF_DATASET } from '../constants/apfData';
+import { APF_Q_DATASET } from '../constants/apfData';
 
 export const ScreeningTool: React.FC = () => {
   const [answers, setAnswers] = useState<Record<string, boolean | null>>({});
   const [showResult, setShowResult] = useState(false);
 
-  const questions = APF_DATASET.filter(d => d.id.startsWith('GAQP'));
+  const questions = APF_Q_DATASET.filter(d => d.id.startsWith('GAQP'));
   
   const handleAnswer = (id: string, value: boolean) => {
     setAnswers(prev => ({ ...prev, [id]: value }));
