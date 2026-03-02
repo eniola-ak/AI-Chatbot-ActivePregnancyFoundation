@@ -4,7 +4,7 @@ import { ChatInterface } from './components/ChatInterface';
 // import { RecommendationsView } from './components/RecommendationsView';
 import { ScreeningTool } from './components/ScreeningTool';
 
-type Tab = 'chat' | 'screening' | 'roadmap';
+type Tab = 'chat' | 'screening'; //'roadmap';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('chat');
@@ -28,7 +28,7 @@ const App: React.FC = () => {
           </div>
 
           <nav className="hidden md:flex bg-slate-100 p-1 rounded-xl gap-1">
-            {(['chat', 'screening', 'roadmap'] as Tab[]).map((tab) => (
+            {(['chat', 'screening'] as Tab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -50,7 +50,7 @@ const App: React.FC = () => {
 
         {/* Mobile Nav */}
         <div className="md:hidden mb-6 flex bg-slate-100 p-1 rounded-xl">
-          {(['chat', 'screening', 'roadmap'] as Tab[]).map((tab) => (
+          {(['chat', 'screening'] as Tab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
