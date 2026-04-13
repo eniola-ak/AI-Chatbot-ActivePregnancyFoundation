@@ -1,69 +1,104 @@
-// src/services/unknownQuestionsLogger.ts
-// Logs questions Nancy couldn't answer to localStorage.
-// No backend required. A future admin view (or CSV export) can read this store.
+// Logs questions Nancy couldn't answer to Supabase (collected across all users).
 
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? '';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
+
+const supabase =
+  supabaseUrl && supabaseKey
+    ? createClient(supabaseUrl, supabaseKey)
+    : null;
 export interface UnknownQuestion {
-  id: string;
+  id?: string;
   question: string;
-  userCategory: string;
-  userName: string;
-  timestamp: string;
-  reviewed: boolean;
+  user_category: string;
+  user_name: string;
+  timestamp?: string;
+  reviewed?: boolean;
 }
 
-const STORAGE_KEY = 'nancy_unknown_questions';
+export function isUnknownResponse(responseText: string): boolean {
+  return responseText
+    .toLowerCase()
+    .includes("i don't have specific information on that in my database");
+}
 
-// ── READ ───────────────────────────────────────────────────────────────────
-export function getUnknownQuestions(): UnknownQuestion[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
+async function logToSupabase(
+  question: string,
+  userCategory: string,
+  userName: string
+): Promise<boolean> {
+  if (!supabase) return false;
+
+  const { error } = await supabase.from('unknown_questions').insert({
+    question,
+    user_category: userCategory,
+    user_name: userName,
+  });
+
+  if (error) {
+    console.warn('Supabase log failed:', error.message);
+    return false;
   }
+
+  return true;
 }
 
-// ── WRITE ──────────────────────────────────────────────────────────────────
-export function logUnknownQuestion(
+function logToLocalStorage(
   question: string,
   userCategory: string,
   userName: string
 ): void {
   try {
-    const existing = getUnknownQuestions();
-    const entry: UnknownQuestion = {
+    const STORAGE_KEY = 'nancy_unknown_questions_fallback';
+    const existing = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
+    existing.push({
       id: `uq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       question,
-      userCategory,
-      userName,
+      user_category: userCategory,
+      user_name: userName,
       timestamp: new Date().toISOString(),
       reviewed: false,
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...existing, entry]));
-  } catch (err) {
-    // localStorage can be unavailable in private browsing — fail silently
-    console.warn('Could not log unknown question:', err);
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
+  } catch {
   }
 }
 
-// ── EXPORT AS CSV (utility for future admin use) ───────────────────────────
-export function exportUnknownQuestionsCSV(): string {
-  const questions = getUnknownQuestions();
-  if (questions.length === 0) return '';
+export async function logUnknownQuestion(
+  question: string,
+  userCategory: string,
+  userName: string
+): Promise<void> {
+  const savedToSupabase = await logToSupabase(question, userCategory, userName);
 
-  const headers = ['id', 'timestamp', 'userName', 'userCategory', 'question', 'reviewed'];
-  const rows = questions.map(q =>
-    headers.map(h => `"${String(q[h as keyof UnknownQuestion]).replace(/"/g, '""')}"`).join(',')
-  );
-
-  return [headers.join(','), ...rows].join('\n');
+  if (!savedToSupabase) {
+    logToLocalStorage(question, userCategory, userName);
+  }
 }
 
-// ── DETECT if Gemini signalled it couldn't answer ─────────────────────────
-// Gemini returns this specific phrase when context is insufficient (per SYSTEM_INSTRUCTION).
-// We key off it to decide whether to log.
-export function isUnknownResponse(responseText: string): boolean {
-  return responseText
-    .toLowerCase()
-    .includes("i don't have specific information on that in my database");
+export async function getUnknownQuestions(): Promise<UnknownQuestion[]> {
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from('unknown_questions')
+    .select('*')
+    .order('timestamp', { ascending: false });
+
+  if (error) {
+    console.warn('Could not fetch unknown questions:', error.message);
+    return [];
+  }
+
+  return data ?? [];
+}
+
+export async function markReviewed(id: string): Promise<void> {
+  if (!supabase) return;
+
+  await supabase
+    .from('unknown_questions')
+    .update({ reviewed: true })
+    .eq('id', id);
 }

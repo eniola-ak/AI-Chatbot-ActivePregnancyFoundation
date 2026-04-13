@@ -6,7 +6,7 @@ import {
   PREGNANCY_SCREENING_QUESTIONS,
   POSTNATAL_SCREENING_QUESTIONS,
   ScreeningQuestion,
-} from '../data/screeningQuestions';
+} from '../../data/screeningQuestions';
 
 // ── TYPES ──────────────────────────────────────────────────────────────────
 type OnboardingStep =
