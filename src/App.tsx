@@ -1,6 +1,8 @@
 // src/App.tsx
 import React from 'react';
 import { ChatInterface } from './components/ChatInterface';
+import { AdminDashboard } from './components/AdminDashboard';
+
 
 const App: React.FC = () => {
   return (
@@ -33,9 +35,9 @@ const App: React.FC = () => {
       </header>
 
       {/* ── MAIN ── */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-6">
-        <ChatInterface />
-      </main>
+<main className="flex-1 max-w-4xl w-full mx-auto px-4 py-6">
+  {window.location.pathname === '/admin' ? <AdminDashboard /> : <ChatInterface />}
+</main>
 
       {/* ── FOOTER ── */}
       <footer className="bg-white border-t border-slate-100 py-6">
