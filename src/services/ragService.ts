@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import type { Chunk } from '../scripts/ingest';
 
 let chunks: Chunk[] | null = null;
@@ -19,16 +20,21 @@ export interface RetrievedContext {
 export async function retrieveContext(query: string, topK = 8): Promise<RetrievedContext[]> {
   const allChunks = await getChunks();
 
-  // Strip common words that don't help matching
-  const stopWords = new Set(['what', 'when', 'where', 'which', 'while', 'that', 'this', 'with', 'from', 'they', 'them', 'have', 'will', 'your', 'about', 'can', 'the', 'and', 'for', 'are', 'was', 'its']);
+  // Strip common stop words
+  const stopWords = new Set([
+    'what', 'when', 'where', 'which', 'while', 'that', 'this', 'with',
+    'from', 'they', 'them', 'have', 'will', 'your', 'about', 'can',
+    'the', 'and', 'for', 'are', 'was', 'its', 'you', 'does', 'how',
+    'safe', 'okay', 'during', 'after', 'before', 'while', 'still',
+  ]);
 
-  // Break query into root stems (e.g. "running" → "run", "pregnant" → "pregnan")
+  // Break query into 5-char stems
   const queryWords = query
     .toLowerCase()
     .replace(/[^a-z\s]/g, '')
     .split(/\s+/)
     .filter(w => w.length > 2 && !stopWords.has(w))
-    .map(w => w.slice(0, 5)); // use first 5 chars as a simple stem
+    .map(w => w.slice(0, 5));
 
   if (queryWords.length === 0) return [];
 
@@ -40,9 +46,8 @@ export async function retrieveContext(query: string, topK = 8): Promise<Retrieve
       if (text.includes(word)) {
         score += 2; // direct stem match
       }
-      // Also check individual characters for partial matches
       if (text.includes(word.slice(0, 4))) {
-        score += 1;
+        score += 1; // partial match
       }
     }
 
