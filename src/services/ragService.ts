@@ -28,30 +28,41 @@ export async function retrieveContext(query: string, topK = 8): Promise<Retrieve
     .replace(/[^a-z\s]/g, '')
     .split(/\s+/)
     .filter(w => w.length > 2 && !stopWords.has(w))
-    .map(w => w.slice(0, 5)); // use first 5 chars as a simple stem
+    .map(w => w.slice(0, 5));
 
   if (queryWords.length === 0) return [];
 
-  const scored = allChunks.map(chunk => {
-    const text = chunk.text.toLowerCase();
-    let score = 0;
+  const scored = allChunks
+    .filter(chunk => {
+      const matches = (chunk.text.match(/YOUR GUIDE TO DURING PREGNANCY AND BEYOND/g) || []).length;
+      return matches < 2;
+    })
+    .map(chunk => {
+      const text = chunk.text.toLowerCase();
+      const label = chunk.sourceLabel.toLowerCase();
+      let score = 0;
 
-    for (const word of queryWords) {
-      if (text.includes(word)) {
-        score += 2; // direct stem match
-      }
-      // Also check individual characters for partial matches
-      if (text.includes(word.slice(0, 4))) {
-        score += 1;
-      }
-    }
+      for (const word of queryWords) {
+        // Label matches — weighted heavily so e.g. "yoga" always surfaces yoga chunks first
+        if (label.includes(word)) {
+          score += 10;
+        }
 
-    return {
-      text: chunk.text,
-      sourceLabel: chunk.sourceLabel,
-      score,
-    };
-  });
+        // Text matches
+        if (text.includes(word)) {
+          score += 2;
+        }
+        if (text.includes(word.slice(0, 4))) {
+          score += 1;
+        }
+      }
+
+      return {
+        text: chunk.text,
+        sourceLabel: chunk.sourceLabel,
+        score,
+      };
+    });
 
   return scored
     .filter(c => c.score > 0)
