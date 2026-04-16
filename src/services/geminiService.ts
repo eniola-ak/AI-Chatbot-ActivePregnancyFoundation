@@ -2,6 +2,7 @@
 // src/services/geminiService.ts
 import { GoogleGenAI } from "@google/genai";
 import { retrieveContext } from "./ragService";
+import { shouldReferToGP, getGPReferralResponse } from '../constants/medicalDictionary';
 
 export interface ChatMessage {
   role: 'user' | 'model';
@@ -17,11 +18,11 @@ export type UserCategory =
   | 'other'
   | null;
 
-const MODEL_CHAIN = [
-  'gemini-2.5-flash-lite',  
+const MODEL_CHAIN = [ 
   'gemini-2.5-flash',
   'gemini-2.0-flash',
   'gemini-1.5-flash',
+  'gemini-2.5-flash-lite', 
   'gemma-3-27b-it',         
   'gemma-3-12b-it',     
   'gemma-3-4b-it', 
@@ -67,10 +68,11 @@ YOUR PERSONALITY:
  
 STRICT RULES:
 1. ONLY answer using the CONTEXT provided below each question.
-2. CRITICAL: If the context does not contain enough information to answer the question fully,
+2. CRITICAL: If the context does not contain ANY information relevant to the question,
    you MUST respond with this sentence word-for-word as your ENTIRE response (do not add anything before or after it):
    "I don't have specific information on that in my database. Please consult your healthcare provider."
    Do NOT paraphrase it. Do NOT say "I don't have specific information about X" — use the exact phrase above.
+   Do NOT use this fallback if the retrieved context mentions the topic at all.
 3. Do NOT use any outside knowledge. Do NOT make things up.
 4. Always recommend consulting a GP or midwife for personal medical decisions.
 5. If a user reports a YES to any screening question, clearly advise them to speak to their GP or midwife before resuming physical activity.
@@ -110,8 +112,11 @@ export const getGeminiResponse = async (
  
   const lastUserMessage = [...history].reverse().find(m => m.role === 'user');
   if (!lastUserMessage) return "Please ask a question.";
+  if (shouldReferToGP(lastUserMessage.text)) {
+  return getGPReferralResponse(lastUserMessage.text)!;}
  
-  const contexts = await retrieveContext(lastUserMessage.text, 5);
+  const contexts = await retrieveContext(lastUserMessage.text, 8);
+  console.log('Retrieved contexts:', contexts.map(c => ({ score: c.score, label: c.sourceLabel, preview: c.text.slice(0, 80) })));
  
   const contextBlock = contexts.length > 0
     ? contexts.map((c, i) => `[${i + 1}] (${c.sourceLabel})\n${c.text}`).join('\n\n')
