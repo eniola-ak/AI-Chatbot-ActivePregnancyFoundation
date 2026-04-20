@@ -4,6 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 import Groq from 'groq-sdk';
 import { retrieveContext } from "./ragService";
 import { logUnknownQuestion } from "./unknownQuestionsLogger";
+import { MEDICAL_GLOSSARY, findMedicalTerm } from "../constants/medicalGlossary";
 
 export interface ChatMessage {
   role: 'user' | 'model';
@@ -29,6 +30,66 @@ const SENTINEL = "I don't have specific information on that in my database. Plea
 
 const MIN_RAG_SCORE = 4;
 
+// ── AUTO-GENERATE SAFETY KEYWORDS FROM GLOSSARY ───────────────────────────────
+// All 76 glossary terms become safety keywords automatically
+// Plus extra clinical terms not in the glossary
+const GLOSSARY_KEYWORDS = MEDICAL_GLOSSARY.map(t => t.term.toLowerCase());
+
+const EXTRA_SAFETY_KEYWORDS = [
+  // Chest & heart
+  "chest pain", "chest tightness", "chest pressure", "chest discomfort",
+  "heart pain", "heart racing", "heart pounding",
+  "heart disease", "cardiac",
+
+  // Breathing
+  "shortness of breath", "cant breathe", "can't breathe",
+  "breathing difficulty", "breathless", "out of breath",
+
+  // Bleeding & fluids
+  "bleeding", "vaginal bleeding", "spotting", "blood loss",
+  "waters broke", "waters breaking", "leaking fluid",
+
+  // Dizziness & head
+  "dizzy", "faint", "fainting", "lightheaded", "light headed",
+  "blurred vision", "blurry vision", "seeing spots",
+  "severe headache", "headache", "migraine",
+
+  // Pain
+  "severe pain", "stomach pain", "tummy pain",
+  "pelvic pressure", "lower back pain", "back pain",
+  "hip pain", "groin pain", "rib pain", "pubic pain",
+  "round ligament pain", "spd pain",
+
+  // Baby movement
+  "baby not moving", "no movement", "reduced movement", "less movement",
+  "baby moving less", "cant feel baby", "can't feel baby",
+
+  // Blood pressure
+  "high blood pressure", "high bp", "low blood pressure", "low bp",
+  "swollen face", "swollen hands", "swollen feet",
+  "swelling face", "swelling hands", "swelling feet",
+
+  // Conditions
+  "anemia", "iron deficiency", "blood clot",
+  "tumour", "tumor", "cancer", "thyroid", "kidney pain",
+  "cervical stitch", "low placenta",
+  "premature labour", "premature labor", "early labour",
+  "contractions", "labour", "labor", "waters",
+  "pregnancy loss",
+
+  // Injury & illness
+  "fell", "fall", "fallen", "accident", "injured", "injury",
+  "fracture", "broken bone", "fever", "infection",
+  "vomiting", "severe nausea",
+
+  // Mental health
+  "suicidal", "self harm",
+  "postnatal depression", "postpartum depression",
+];
+
+const ALL_SAFETY_KEYWORDS = [...new Set([...GLOSSARY_KEYWORDS, ...EXTRA_SAFETY_KEYWORDS])];
+
+// ── SYSTEM INSTRUCTION ────────────────────────────────────────────────────────
 function buildSystemInstruction(userName: string, category: UserCategory): string {
   const categoryContext: Record<NonNullable<UserCategory>, string> = {
     preconception: "This user is thinking of becoming pregnant. Focus on preconception physical activity guidance from APF resources.",
@@ -64,6 +125,24 @@ RULES:
 `.trim();
 }
 
+// ── TERM EXPLANATION SYSTEM INSTRUCTION ──────────────────────────────────────
+function buildTermExplainInstruction(userName: string): string {
+  return `
+You are Nancy — a warm, friendly assistant from the Active Pregnancy Foundation (APF).
+Your job is to explain a medical term in plain English using the definition provided,
+then warmly advise the user to speak to their GP or midwife before any physical activity.
+
+RULES:
+1. Explain the term in 1-2 sentences using ONLY the definition provided. Do not add extra medical information.
+2. Use warm, friendly, plain English — like a knowledgeable friend explaining something.
+3. After explaining, advise them to speak to their GP or midwife.
+4. If it sounds urgent, mention NHS 111.
+5. Use the user's name if provided.
+6. Never diagnose. Never prescribe. Never suggest treatments.
+7. Keep the whole response to 3-4 sentences maximum.
+`.trim();
+}
+
 // ── GROQ ──────────────────────────────────────────────────────────────────────
 async function tryGroq(
   contents: { role: string; parts: { text: string }[] }[],
@@ -86,7 +165,7 @@ async function tryGroq(
     model: 'llama-3.1-8b-instant',
     messages,
     temperature: 0.1,
-    max_tokens: 800,
+    max_tokens: 400,
   });
 
   const text = completion.choices[0]?.message?.content;
@@ -111,7 +190,34 @@ async function tryGeminiModel(
   return text;
 }
 
-// ── MAIN ──────────────────────────────────────────────────────────────────────
+// ── LLM CALL (Groq first, Gemini fallback) ────────────────────────────────────
+async function callLLM(
+  contents: { role: string; parts: { text: string }[] }[],
+  systemInstruction: string
+): Promise<string> {
+  // Try Groq first
+  try {
+    const text = await tryGroq(contents, systemInstruction);
+    return text;
+  } catch (err) {
+    console.warn('Groq failed → Gemini:', err);
+  }
+
+  // Gemini fallback
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' });
+  for (const model of GEMINI_MODEL_CHAIN) {
+    try {
+      const text = await tryGeminiModel(ai, model, contents, systemInstruction);
+      return text;
+    } catch (err) {
+      console.warn(`Gemini ${model} failed`);
+    }
+  }
+
+  throw new Error('All models failed');
+}
+
+// ── MAIN EXPORT ───────────────────────────────────────────────────────────────
 export const getGeminiResponse = async (
   history: ChatMessage[],
   userName: string = '',
@@ -123,69 +229,44 @@ export const getGeminiResponse = async (
 
   const userText = lastUserMessage.text.toLowerCase();
 
-  // ── SAFETY KEYWORD FILTER ─────────────────────────────────────────────────
-  const SAFETY_KEYWORDS = [
-    // Chest & heart
-    "chest pain", "chest tightness", "chest pressure", "chest discomfort",
-    "heart pain", "heart racing", "heart pounding", "palpitations",
-    "heart condition", "heart disease", "cardiac",
+  // ── SAFETY KEYWORD CHECK ──────────────────────────────────────────────────
+  const matchedKeyword = ALL_SAFETY_KEYWORDS.find(kw => userText.includes(kw));
 
-    // Breathing
-    "shortness of breath", "cant breathe", "can't breathe",
-    "breathing difficulty", "breathless", "out of breath",
-
-    // Bleeding & fluids
-    "bleeding", "vaginal bleeding", "spotting", "blood loss",
-    "amniotic fluid", "waters broke", "waters breaking", "leaking fluid",
-
-    // Dizziness & head
-    "dizziness", "dizzy", "faint", "fainting", "lightheaded", "light headed",
-    "blurred vision", "blurry vision", "seeing spots",
-    "severe headache", "headache", "migraine",
-
-    // Pain
-    "severe pain", "abdominal pain", "stomach pain", "tummy pain",
-    "pelvic pain", "pelvic pressure", "lower back pain", "back pain",
-    "hip pain", "groin pain", "rib pain", "pubic pain",
-    "round ligament pain", "spd pain",
-
-    // Baby movement
-    "baby not moving", "no movement", "reduced movement", "less movement",
-    "baby moving less", "cant feel baby", "can't feel baby",
-
-    // Blood pressure
-    "high blood pressure", "high bp", "low blood pressure", "low bp",
-    "blood pressure", "hypertension", "hypotension",
-    "preeclampsia", "eclampsia",
-    "swollen face", "swollen hands", "swollen feet",
-    "swelling face", "swelling hands", "swelling feet",
-
-    // Conditions
-    "gestational diabetes", "diabetes", "epilepsy", "seizure",
-    "blood clot", "dvt", "cancer", "tumour", "tumor",
-    "thyroid", "kidney disease", "kidney pain",
-    "anaemia", "anemia", "iron deficiency",
-
-    // Pregnancy complications
-    "placenta previa", "placenta praevia", "low placenta",
-    "incompetent cervix", "weak cervix", "cerclage", "cervical stitch",
-    "premature labour", "premature labor", "preterm", "early labour",
-    "contractions", "labour", "labor", "waters",
-
-    // History
-    "miscarriage", "ectopic", "stillbirth", "pregnancy loss",
-
-    // Injury & illness
-    "fell", "fall", "fallen", "accident", "injured", "injury",
-    "fracture", "broken bone", "fever", "infection", "temperature",
-    "vomiting", "hyperemesis", "severe nausea",
-
-    // Mental health
-    "suicidal", "self harm", "postnatal depression", "postpartum depression",
-  ];
-
-  if (SAFETY_KEYWORDS.some(kw => userText.includes(kw))) {
+  if (matchedKeyword) {
     await logUnknownQuestion(lastUserMessage.text, category ?? 'unknown', userName ?? 'unknown');
+
+    // Try to find a glossary definition for the matched term
+    const glossaryEntry = findMedicalTerm(userText);
+
+    if (glossaryEntry) {
+      // We have a definition — ask LLM to explain it warmly then refer to GP
+      console.log(`📖 Found glossary term: "${glossaryEntry.term}" (${glossaryEntry.source})`);
+
+      const explainPrompt = `
+The user ${userName ? `(${userName}) ` : ''}mentioned the medical term: "${glossaryEntry.term}"
+
+Definition from ${glossaryEntry.source}:
+"${glossaryEntry.definition}"
+
+Using ONLY this definition, please:
+1. Explain what "${glossaryEntry.term}" means in 1-2 warm, plain English sentences
+2. Advise them to speak to their GP or midwife before any physical activity
+3. If it sounds urgent or serious, mention NHS 111 as well
+`;
+
+      try {
+        const contents = [{ role: 'user', parts: [{ text: explainPrompt }] }];
+        const systemInstruction = buildTermExplainInstruction(userName);
+        const explanation = await callLLM(contents, systemInstruction);
+        return explanation;
+      } catch (err) {
+        console.warn('LLM failed for term explanation, using fallback');
+        // Fallback if LLM fails
+        return `⚠️ Just so you know — "${glossaryEntry.term}" means: ${glossaryEntry.definition} (Source: ${glossaryEntry.source})\n\nBecause of this, please speak to your GP or midwife before doing any physical activity. If you need urgent help, call NHS 111. Take care of yourself! 💜`;
+      }
+    }
+
+    // No glossary entry — use standard safety message
     return `⚠️ ${userName ? userName + ', t' : 'T'}hat's really important to get checked out properly. I'm not able to give personal medical advice on that, but please speak to your GP or midwife — they'll give you the right guidance for your situation. If you need urgent help, call NHS 111. Take care of yourself! 💜`;
   }
 
@@ -223,7 +304,7 @@ export const getGeminiResponse = async (
 
   const systemInstruction = buildSystemInstruction(userName, category);
 
-  // ── 1. GROQ FIRST (no daily limits) ──────────────────────────────────────
+  // ── CALL LLM ──────────────────────────────────────────────────────────────
   try {
     console.log('Trying Groq: llama-3.1-8b-instant');
     const text = await tryGroq(contents, systemInstruction);
@@ -233,7 +314,6 @@ export const getGeminiResponse = async (
     console.warn('Groq failed → trying Gemini:', err);
   }
 
-  // ── 2. GEMINI FALLBACK ────────────────────────────────────────────────────
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' });
   const errors: string[] = [];
 
@@ -250,7 +330,6 @@ export const getGeminiResponse = async (
     }
   }
 
-  // ── 3. ALL FAILED ─────────────────────────────────────────────────────────
   console.error('All models failed:\n' + errors.join('\n'));
   return "I'm having trouble connecting right now. Please try again in a moment, or contact the APF team directly if the problem persists.";
 };
