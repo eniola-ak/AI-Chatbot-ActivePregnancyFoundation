@@ -1,6 +1,6 @@
 // src/data/screeningQuestions.ts
 //
-// Pregnancy questions: drawn directly from GAQ-P (apfData.ts APF_Q_DATASET).
+// Pregnancy questions: drawn directly from GAQ-P
 // Postnatal questions: drawn from the International Delphi study and POGP leaflets.
 //
 // Each question has a yesAction:
@@ -14,194 +14,187 @@ export interface ScreeningQuestion {
   yesAction: 'refer_immediately' | 'refer_and_continue' | 'note_and_continue';
 }
 
-// ── PREGNANCY SCREENING ────────────────────────────────────────────────────
-// Source: GAQ-P (apfData.ts APF_Q_DATASET)
-// Section 1 = clinical contraindications → refer_immediately
-// Section 2 = history questions          → refer_and_continue
-// Sections 3 & 4 = open questions        → note_and_continue / refer_and_continue
+// ── PREGNANCY SCREENING (GAQ-P) ───────────────────────────────────────────────
 
 export const PREGNANCY_SCREENING_QUESTIONS: ScreeningQuestion[] = [
   {
     id: 'preg-intro',
-    text: "Before we dive in, I'd like to run through a few quick health questions — just to make sure I point you in the right direction. 😊 There are no wrong answers!\n\nDo you have any mild, moderate, or severe respiratory or cardiovascular disease — for example, chronic bronchitis or a heart condition?",
+    text: "Before we get into the fun stuff, I'd love to ask you a few quick health questions — it only takes a minute and helps me give you the right guidance. No wrong answers at all! 😊\n\nHas a doctor ever mentioned anything about your heart or lungs — like a heart condition, chronic bronchitis, or any breathing problems?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'preg-01-b',
-    text: "Do you have epilepsy that is not currently stable?",
+    text: "Do you have epilepsy, and has it been hard to manage lately?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'preg-01-c',
-    text: "Do you have Type 1 diabetes that isn't stable, or is your blood sugar outside of your target ranges?",
+    text: "Do you have Type 1 diabetes? If so, has your blood sugar been a bit up and down recently?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'preg-01-d',
-    text: "Do you have thyroid disease that isn't stable, or is your thyroid function outside of your target ranges?",
+    text: "Have you been told you have a thyroid condition — and has it been tricky to keep under control?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'preg-01-e',
-    text: "Do you have an eating disorder or are you experiencing malnutrition?",
+    text: "Are you currently struggling with your relationship with food, or feeling like you might not be eating enough?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'preg-01-f',
-    text: "Are you pregnant with twins at 28 weeks or later — or expecting triplets or more?",
+    text: "Are you expecting more than one baby — like twins at 28 weeks or more, or triplets at any stage?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'preg-01-g',
-    text: "Have you been told you have a low red blood cell count (anaemia), and are you experiencing high levels of fatigue or light-headedness because of it?",
+    text: "Have you been told your iron levels are low (anaemia)? And if so, are you feeling really exhausted or dizzy because of it?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'preg-01-h',
-    text: "Do you have high blood pressure — such as pre-eclampsia, gestational hypertension, or chronic hypertension that isn't stable?",
+    text: "How has your blood pressure been during this pregnancy? Has your midwife or doctor mentioned anything like high blood pressure or pre-eclampsia?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'preg-01-i',
-    text: "Have you been told your baby is growing slowly (sometimes called intrauterine growth restriction)?",
+    text: "Has your doctor or midwife said anything about your baby's growth — like that they might be growing a little slowly?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'preg-01-j',
-    text: "Have you had any unexplained bleeding, ruptured membranes, or signs of labour before 37 weeks?",
+    text: "Have you had any bleeding, or has your midwife mentioned anything about early signs of labour or your waters?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'preg-01-k',
-    text: "Have you been told your placenta is partially or completely covering your cervix (placenta praevia)?",
+    text: "Has anyone mentioned anything about where your placenta is sitting — like that it might be low or covering the cervix?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'preg-01-l',
-    text: "Do you have a weak cervix (sometimes called cervical incompetence)?",
+    text: "Have you been told your cervix is a little weak or short — sometimes called cervical incompetence?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'preg-01-m',
-    text: "Do you have a stitch or tape in place to reinforce your cervix (a cerclage)?",
+    text: "Do you have a cervical stitch in place — sometimes called a cerclage — to help support your cervix?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'preg-02-a',
-    text: "Have you had two or more miscarriages — losses before 20 weeks?",
+    text: "Have you experienced two or more pregnancy losses before 20 weeks in the past?",
     yesAction: 'refer_and_continue',
   },
   {
     id: 'preg-02-b',
-    text: "Have you previously had an early delivery before 37 weeks in a past pregnancy?",
+    text: "Have you had a baby arrive early — before 37 weeks — in a previous pregnancy?",
     yesAction: 'refer_and_continue',
   },
   {
     id: 'preg-03',
-    text: "Is there any other medical condition you have that might affect your ability to be physically active during pregnancy? If yes, feel free to describe it briefly.",
+    text: "Is there anything else health-wise that you think might be worth mentioning — anything that could affect how you move or exercise during pregnancy?",
     yesAction: 'refer_and_continue',
   },
   {
     id: 'preg-04',
-    text: "And finally — is there any other reason you're feeling concerned about physical activity during your pregnancy? There's no wrong answer here! 💛",
+    text: "Last one, I promise! Is there anything else making you feel a bit nervous or unsure about being active during your pregnancy? Totally okay if there is — just good to know! 💛",
     yesAction: 'note_and_continue',
   },
 ];
 
-// ── POSTNATAL SCREENING ────────────────────────────────────────────────────
-// Source: International Delphi study of clinical and exercise professionals'
-//         opinion of physical activity prescreening and contraindications for
-//         postpartum physical activity; POGP Patient Leaflets.
+// ── POSTNATAL SCREENING (GAQ-PP) ──────────────────────────────────────────────
 
 export const POSTNATAL_SCREENING_QUESTIONS: ScreeningQuestion[] = [
   {
     id: 'post-intro',
-    text: "Congratulations on your little one! 🎉 Before we get into the good stuff, I'd like to run through a quick health check to make sure you're ready to get moving safely.\n\nHave you had any loss of consciousness for any reason since giving birth?",
+    text: "Congratulations on your little one! 🎉 Before we get into the good stuff, I'd love to ask a few quick questions — just to make sure we get the activity guidance right for where you're at right now.\n\nSince giving birth, have you ever fainted or lost consciousness at any point?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'post-02',
-    text: "Have you noticed any problems with coordination, muscle weakness, or balance?",
+    text: "Have you noticed anything unusual with your balance, coordination, or muscle strength — like feeling unsteady on your feet?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'post-03',
-    text: "Have you had any signs of a blood clot — for example, leg pain or swelling, warm or red skin on your leg, or sudden shortness of breath?",
+    text: "Have you had any pain, swelling or redness in your legs — or felt suddenly short of breath for no obvious reason? These can sometimes be signs of a blood clot.",
     yesAction: 'refer_immediately',
   },
   {
     id: 'post-04',
-    text: "Is your blood pressure elevated (above 140/90) and not yet under control?",
+    text: "How has your blood pressure been since having your baby? Has it been on the higher side or hard to keep under control?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'post-05',
-    text: "Are you currently experiencing an eating disorder or malnutrition?",
+    text: "Are you currently struggling with your relationship with food, or feeling like you might not be getting enough to eat?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'post-06',
-    text: "Have you been diagnosed with postpartum cardiomyopathy — a heart condition that can develop after childbirth?",
+    text: "Has a doctor mentioned anything about your heart since you gave birth — like a condition called postpartum cardiomyopathy?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'post-07',
-    text: "Have you had any new chest pain, dizziness, or stroke-like symptoms — such as face drooping, arm weakness, or slurred speech — during everyday activities or at rest?",
+    text: "Have you had any chest discomfort, dizziness, or anything that felt unusual — like facial drooping, arm weakness, or difficulty speaking?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'post-08',
-    text: "Are you experiencing severe abdominal pain?",
+    text: "Are you having any pain in your tummy or abdomen that feels quite severe?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'post-09',
-    text: "Do you get chest pain, dizziness, or feel lightheaded specifically during exercise?",
+    text: "When you do any physical activity, do you get chest pain, feel dizzy, or feel light-headed?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'post-10',
-    text: "Do you have any breathing difficulties at rest that don't improve with medication?",
+    text: "Are you having any trouble breathing even when you're just resting — and it doesn't seem to improve?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'post-11',
-    text: "Do you have kidney disease?",
+    text: "Have you been told you have kidney disease?",
     yesAction: 'refer_and_continue',
   },
   {
     id: 'post-12',
-    text: "Are you experiencing excessive fatigue — beyond normal tiredness — that doesn't improve even when you rest?",
+    text: "Are you feeling really exhausted — beyond the usual new baby tiredness — and rest doesn't seem to help much?",
     yesAction: 'refer_and_continue',
   },
   {
     id: 'post-13',
-    text: "Do you have a severe infection right now, with fever, body aches, or swollen glands?",
+    text: "Are you currently unwell with a fever, body aches, or swollen glands?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'post-14',
-    text: "Do you have a broken bone or any other significant injury?",
+    text: "Have you had a fracture or injury recently that might affect your movement?",
     yesAction: 'refer_and_continue',
   },
   {
     id: 'post-15',
-    text: "If you had a caesarean section — is there pain at the incision site that gets worse when you move or exercise?",
+    text: "If you had a c-section — how is your scar feeling? Any pain around it, especially when you move?",
     yesAction: 'refer_and_continue',
   },
   {
     id: 'post-16',
-    text: "Do you have any vaginal bleeding that isn't your normal period?",
+    text: "Have you had any vaginal bleeding that doesn't seem like your normal period returning?",
     yesAction: 'refer_immediately',
   },
   {
     id: 'post-17',
-    text: "Do you have any other medical condition that might affect your ability to be physically active after having your baby? If yes, feel free to describe it briefly.",
+    text: "Is there anything else health-wise you'd like to mention — anything that might affect how you get back into activity after having your baby?",
     yesAction: 'refer_and_continue',
   },
   {
     id: 'post-18',
-    text: "And last one — are you feeling anxious or worried about returning to or increasing your physical activity after birth? There's genuinely no wrong answer here. 💛",
+    text: "And the very last one — how are you feeling about getting back to being active? Any worries or nerves about it? Completely normal if you do! 💛",
     yesAction: 'note_and_continue',
   },
 ];
