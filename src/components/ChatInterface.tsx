@@ -1,14 +1,14 @@
 // src/components/ChatInterface.tsx
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { getGeminiResponse, ChatMessage, UserCategory } from '../services/geminiService';
+import { getGeminiResponse, explainMedicalTerm ,ChatMessage, UserCategory } from '../services/geminiService';
 import { logUnknownQuestion, isUnknownResponse } from '../services/unknownQuestionsLogger';
 import {
   PREGNANCY_SCREENING_QUESTIONS,
   POSTNATAL_SCREENING_QUESTIONS,
   ScreeningQuestion,
 } from '../../data/screeningQuestions';
+import {findMediclTerm} from '../constants/medicalGlossary';
 
-// ── TYPES ──────────────────────────────────────────────────────────────────
 type OnboardingStep =
   | 'ask_name'
   | 'ask_category'
@@ -30,6 +30,7 @@ interface DisplayMessage {
   text: string;
   showQuickReplies?: QuickReply[];
   showYesNo?: boolean;
+  explainLabel?: string;
 }
 
 interface QuickReply {
@@ -37,7 +38,6 @@ interface QuickReply {
   label: string;
 }
 
-// ── CONSTANTS ──────────────────────────────────────────────────────────────
 const CATEGORY_OPTIONS: QuickReply[] = [
   { value: 'preconception', label: '🌱 Thinking of becoming pregnant' },
   { value: 'pregnant',      label: '🤰 Currently pregnant' },
@@ -68,7 +68,6 @@ function userMsg(text: string): DisplayMessage {
   return { id: makeId(), role: 'user', text };
 }
 
-// ── NANCY AVATAR — uses real APF logo from public/ ─────────────────────────
 const NancyAvatar: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'sm' }) => {
   const dim = size === 'md' ? 'w-10 h-10' : 'w-6 h-6';
   const imgSize = size === 'md' ? 'h-8' : 'h-4';
@@ -83,8 +82,10 @@ const NancyAvatar: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'sm' }) => {
   );
 };
 
-// ── YES / NO / NOT SURE BUTTONS ────────────────────────────────────────────
-const YesNoButtons: React.FC<{ onSelect: (v: string) => void }> = ({ onSelect }) => (
+const YesNoButtons: React.FC<{
+  onSelect: (v: string) => void;
+  explainLabel?: string;
+}> = ({ onSelect, explainLabel }) => (
   <div className="flex gap-2 mt-3 flex-wrap">
     <button
       onClick={() => onSelect('Yes')}
@@ -98,11 +99,9 @@ const YesNoButtons: React.FC<{ onSelect: (v: string) => void }> = ({ onSelect })
     >
       No
     </button>
-    <button
-      onClick={() => onSelect("I'm not sure")}
-      className="px-6 py-2 rounded-full text-sm font-semibold bg-amber-50 border border-amber-300 text-amber-700 hover:bg-amber-100 active:scale-95 transition-all"
-    >
-      Not sure
+    <button onClick={() => onSelect("I'm not sure")}
+      className="px-6 py-2 rounded-full text-sm font-semibold bg-amber-50 border border-amber-300 text-amber-700 hover:bg-amber-100 active:scale-95 transition-all">
+      {explainLabel ? `💬 Explain "${explainLabel}"` : 'Not sure'}
     </button>
   </div>
 );
@@ -162,7 +161,6 @@ export const ChatInterface: React.FC = () => {
     setDisplayMessages(prev => [...prev, msg]);
   }, []);
 
-  // ── FINISH SCREENING ─────────────────────────────────────────────────────
   const finishScreening = useCallback(
     (flagged: boolean, name: string, category: UserCategory) => {
       setUserProfile(prev => ({ ...prev, screeningComplete: true }));
@@ -179,7 +177,7 @@ export const ChatInterface: React.FC = () => {
       setTimeout(() => {
         addMessage(
           nancyMsg(
-            `That's all the health questions done — well done for getting through them, ${name}! 🎉\n\n${flagNote}It sounds like ${categoryLine}. What would you like to know?`
+            `That's all the health questions done! Well done for getting through them, ${name}! 🎉\n\n${flagNote}It sounds like ${categoryLine}. What would you like to know?`
           )
         );
       }, 400);
@@ -187,8 +185,8 @@ export const ChatInterface: React.FC = () => {
     [addMessage]
   );
 
-  // ── SCREENING ANSWER HANDLER ─────────────────────────────────────────────
-  const handleScreeningAnswer = useCallback(
+
+  const handleScreeningAnswer = useCallback(async
     (
       answer: string,
       currentIndex: number,
@@ -198,89 +196,116 @@ export const ChatInterface: React.FC = () => {
       addMessage(userMsg(answer));
 
       const question = questions[currentIndex];
-      const isYes =
-        answer.toLowerCase().startsWith('yes') ||
-        answer.toLowerCase().includes('not sure');
+      const isNotSure = answer.toLowerCase().includes('not sure');
+      const isYes = answer.toLowerCase().startsWith('yes');
 
-      if (isYes && question.yesAction === 'refer_immediately') {
-        setUserProfile(prev => ({ ...prev, screeningFlaggedYes: true, screeningComplete: true }));
-        setOnboardingStep('chat');
-        setTimeout(() => {
-          addMessage(
-            nancyMsg(
-              `Thank you for being so honest with me, ${currentProfile.name} 💛\n\nBecause of what you've shared, I'd really encourage you to speak with your **GP or midwife before starting or increasing physical activity** — they're the best people to make sure you're safe.\n\nI've made a note of this. Is there anything else I can help you with in the meantime?`
-            )
-          );
-        }, 400);
-        return;
-      }
+      if (isNotSure) {
+      const termToExplain = question.explainTerm;
 
-      const nextIndex = currentIndex + 1;
+      if (termToExplain) {
+        // Find glossary entry for this specific term
+        const glossaryEntry = findMedicalTerm(termToExplain);
 
-      if (isYes && question.yesAction === 'refer_and_continue') {
-        setUserProfile(prev => ({ ...prev, screeningFlaggedYes: true }));
-        setTimeout(() => {
-          if (nextIndex < questions.length) {
-            setScreeningIndex(nextIndex);
-            addMessage(
-              nancyMsg(
-                `Thanks for letting me know — I'd recommend mentioning that to your GP or midwife. 💛\n\n${questions[nextIndex].text}`,
-                { showYesNo: true }
-              )
+        if (glossaryEntry) {
+          setIsLoading(true);
+          try {
+            const rephrased = await explainMedicalTerm(
+              glossaryEntry.term,
+              glossaryEntry.definition,
+              glossaryEntry.source,
+              currentProfile.name
             );
-          } else {
-            finishScreening(true, currentProfile.name, currentProfile.category);
+          setIsLoading(false);
+            addMessage(nancyMsg(
+              `${rephrased}\n\nDoes this apply to you?`,
+              { showYesNo: true, explainLabel: undefined }
+            ));
+          } catch {
+            setIsLoading(false);
+            addMessage(nancyMsg(
+              `No worries! 💬 **${glossaryEntry.term}** means: ${glossaryEntry.definition} _(Source: ${glossaryEntry.source})_\n\nDoes this apply to you?`,
+              { showYesNo: true, explainLabel: undefined }
+            ));
           }
-        }, 400);
-        return;
+        } else {
+          // Term not in glossary — show generic
+          addMessage(nancyMsg(
+            `No worries! It might be worth checking with your GP or midwife to find out more about "${termToExplain}". Does this apply to you?`,
+            { showYesNo: true, explainLabel: undefined }
+          ));
+        }
+      } else {
+        // No explainTerm on this question
+        addMessage(nancyMsg(
+          `No worries! It might be worth checking with your GP or midwife to find out. Does this apply to you?`,
+          { showYesNo: true, explainLabel: undefined }
+        ));
       }
+      return;
+    }
+    if (isYes && question.yesAction === 'refer_immediately') {
+      setUserProfile(prev => ({ ...prev, screeningFlaggedYes: true, screeningComplete: true }));
+      setOnboardingStep('chat');
+      setTimeout(() => {
+        addMessage(nancyMsg(
+          `Thank you for being so honest with me, ${currentProfile.name} 💛\n\nBecause of what you've shared, I'd really encourage you to speak with your **GP or midwife before starting or increasing physical activity** — they're the best people to make sure you're safe.\n\nI've made a note of this. Is there anything else I can help you with in the meantime?`
+        ));
+      }, 400);
+      return;
+    }
 
-      // note_and_continue or No — just move on
+    const nextIndex = currentIndex + 1;
+
+    // ── YES + refer_and_continue → flag and move on ───────────────────────
+    if (isYes && question.yesAction === 'refer_and_continue') {
+      setUserProfile(prev => ({ ...prev, screeningFlaggedYes: true }));
+
       setTimeout(() => {
         if (nextIndex < questions.length) {
           setScreeningIndex(nextIndex);
-          addMessage(nancyMsg(questions[nextIndex].text, { showYesNo: true }));
+          const nextQ = questions[nextIndex];
+          addMessage(nancyMsg(
+            `Thanks for letting me know. I'd recommend mentioning that to your GP or midwife. 💛\n\n${nextQ.text}`,
+            { showYesNo: true, explainLabel: nextQ.explainTerm }
+          ));
         } else {
-          finishScreening(
-            currentProfile.screeningFlaggedYes,
-            currentProfile.name,
-            currentProfile.category
-          );
+          finishScreening(true, currentProfile.name, currentProfile.category);
         }
       }, 400);
-    },
-    [addMessage, finishScreening]
-  );
 
-  // ── CATEGORY SELECT HANDLER ──────────────────────────────────────────────
-  const handleCategorySelect = useCallback(
-    (value: string, name: string) => {
-      const category = value as NonNullable<UserCategory>;
-      const label = CATEGORY_OPTIONS.find(o => o.value === value)?.label ?? value;
-
-      addMessage(userMsg(label));
-      setCategoryChosen(true);
-
-      const updatedProfile: UserProfile = {
-        name,
-        category,
-        otherDetail: '',
-        screeningComplete: false,
-        screeningFlaggedYes: false,
-      };
-      setUserProfile(updatedProfile);
-
-      if (category === 'other') {
-        setOnboardingStep('ask_other_detail');
-        setTimeout(() => {
-          addMessage(
-            nancyMsg(
-              `No problem at all, ${name}! 😊 Could you briefly describe your situation so I can try to help you as best I can?`
-            )
-          );
-        }, 400);
-        return;
+      return;
+    }
+    setTimeout(() => {
+      if (nextIndex < questions.length) {
+        setScreeningIndex(nextIndex);
+        const nextQ = questions[nextIndex];
+        addMessage(nancyMsg(
+          nextQ.text,
+          { showYesNo: true, explainLabel: nextQ.explainTerm }
+        ));
+      } else {
+        finishScreening(currentProfile.screeningFlaggedYes, currentProfile.name, currentProfile.category);
       }
+    }, 400);
+  }, [addMessage, finishScreening]);
+
+  // ── CATEGORY SELECT ──────────────────────────────────────────────────────
+  const handleCategorySelect = useCallback((value: string, name: string) => {
+    const category = value as NonNullable<UserCategory>;
+    const label = CATEGORY_OPTIONS.find(o => o.value === value)?.label ?? value;
+    addMessage(userMsg(label));
+    setCategoryChosen(true);
+
+    const updatedProfile: UserProfile = {
+      name, category, otherDetail: '', screeningComplete: false, screeningFlaggedYes: false,
+    };
+    setUserProfile(updatedProfile);
+
+    if (category === 'other') {
+      setOnboardingStep('ask_other_detail');
+      setTimeout(() => addMessage(nancyMsg(`No problem at all, ${name}! 😊 Could you briefly describe your situation so I can try to help you as best I can?`)), 400);
+      return;
+    }
 
       if (
         category === 'preconception' ||
@@ -288,9 +313,9 @@ export const ChatInterface: React.FC = () => {
         category === 'supporter'
       ) {
         const intros: Record<string, string> = {
-          preconception: `Wonderful, ${name}! Thinking about having a baby is such an exciting time. 🌱\n\nBeing active before pregnancy can make a real difference — both for you and your future baby. What would you like to know?`,
-          professional: `Great to have you here! 🩺 As a professional supporting pregnant or postnatal women, you might also want to explore the **This Mum Moves** educational programme at activepregnancyfoundation.org/thismummoves — it's packed with evidence-based resources.\n\nWhat can I help you with today?`,
-          supporter: `How lovely that you're here to support someone! 💛 Physical activity can make a big difference to how a pregnant or postnatal person feels — and your encouragement matters more than you know.\n\nWhat would you like to find out?`,
+          preconception: `Wonderful, ${name}! Thinking about having a baby is such an exciting time. 🌱\n\nBeing active before pregnancy can make a real difference both for you and your future baby. What would you like to know?`,
+          professional: `Great to have you here! As a professional supporting pregnant or postnatal women, you might also want to explore the **This Mum Moves** educational programme at activepregnancyfoundation.org/thismummoves. It's packed with evidence-based resources.\n\nWhat can I help you with today?`,
+          supporter: `How lovely that you're here to support someone! 💛 Physical activity can make a big difference to how a pregnant or postnatal person feels and your encouragement matters more than you know.\n\nWhat would you like to find out?`,
         };
         setOnboardingStep('chat');
         setTimeout(() => addMessage(nancyMsg(intros[category])), 400);
@@ -308,7 +333,8 @@ export const ChatInterface: React.FC = () => {
       setOnboardingStep('screening');
 
       setTimeout(() => {
-        addMessage(nancyMsg(questions[0].text, { showYesNo: true }));
+        const firstQ = questions[0]
+        addMessage(nancyMsg(firstQ.text, { showYesNo: true, explainLabel: firstQ.explainTerm }));
       }, 400);
     },
     [addMessage]
@@ -340,7 +366,6 @@ export const ChatInterface: React.FC = () => {
       return;
     }
 
-    // Step 2: "other" detail
     if (onboardingStep === 'ask_other_detail') {
       setUserProfile(prev => ({ ...prev, otherDetail: trimmed }));
       addMessage(userMsg(trimmed));
@@ -355,7 +380,6 @@ export const ChatInterface: React.FC = () => {
       return;
     }
 
-    // Free chat
     if (onboardingStep === 'chat') {
       addMessage(userMsg(trimmed));
       setIsLoading(true);
@@ -386,7 +410,6 @@ export const ChatInterface: React.FC = () => {
     }
   };
 
-  // ── RENDER ───────────────────────────────────────────────────────────────
   const showTextInput =
     onboardingStep !== 'ask_category' && onboardingStep !== 'screening';
 
@@ -473,6 +496,7 @@ export const ChatInterface: React.FC = () => {
                   isLatest &&
                   onboardingStep === 'screening' && (
                     <YesNoButtons
+                      explainLabel ={msg.explainLabel}
                       onSelect={val =>
                         handleScreeningAnswer(
                           val,
@@ -513,7 +537,7 @@ export const ChatInterface: React.FC = () => {
         )}
       </div>
 
-      {/* Text input — hidden during category selection and screening */}
+      {/* Text input */}
       {showTextInput && (
         <div className="p-4 bg-white border-t border-purple-50 flex-shrink-0">
           <div className="flex gap-2">
