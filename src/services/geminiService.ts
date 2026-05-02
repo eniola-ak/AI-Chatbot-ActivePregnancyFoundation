@@ -102,7 +102,6 @@ async function tryModel(
   return text;
 }
  
-// ── MAIN EXPORT ────────────────────────────────────────────────────────────
 export const getGeminiResponse = async (
   history: ChatMessage[],
   userName: string = '',
