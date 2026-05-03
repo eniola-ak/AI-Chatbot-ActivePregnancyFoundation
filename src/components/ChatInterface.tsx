@@ -7,7 +7,7 @@ import {
   POSTNATAL_SCREENING_QUESTIONS,
   ScreeningQuestion,
 } from '../../data/screeningQuestions';
-import {findMediclTerm} from '../constants/medicalGlossary';
+import {findMedicalTerm} from '../constants/medicalGlossary';
 
 type OnboardingStep =
   | 'ask_name'
@@ -184,8 +184,7 @@ export const ChatInterface: React.FC = () => {
   );
 
 
-  const handleScreeningAnswer = useCallback(async
-    (
+  const handleScreeningAnswer = useCallback(async(
       answer: string,
       currentIndex: number,
       currentProfile: UserProfile,
