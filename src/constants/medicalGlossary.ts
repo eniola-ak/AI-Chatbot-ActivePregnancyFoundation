@@ -136,7 +136,6 @@ const SCREENING_PRIORITY_TERMS = [
 export function findMedicalTerm(text: string): MedicalTerm | null {
   const lower = text.toLowerCase();
 
-  // Check priority clinical terms first (exact match)
   for (const priority of SCREENING_PRIORITY_TERMS) {
     if (lower.includes(priority)) {
       const found = MEDICAL_GLOSSARY.find(t => t.term.toLowerCase() === priority);
@@ -144,7 +143,6 @@ export function findMedicalTerm(text: string): MedicalTerm | null {
     }
   }
 
-  // Try exact match against full glossary
   const exact = MEDICAL_GLOSSARY.find(t => lower.includes(t.term.toLowerCase()));
   if (exact) return exact;
 

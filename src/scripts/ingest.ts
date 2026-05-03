@@ -9,13 +9,11 @@ import { SOURCES } from '../constants/sources';
 const require = createRequire(import.meta.url);
 const PDFParser = require('pdf2json');
 
-// ── CONFIG ─────────────────────────────────────────────────────────────────
 const CHUNK_SIZE = 400;
 const CHUNK_OVERLAP = 80;
 const OUTPUT_PATH = './src/constants/chunks.json';
 const TMP_IMAGE_DIR = './data/tmp_images';
 
-// ── TYPES ──────────────────────────────────────────────────────────────────
 export interface Chunk {
   id: string;
   sourceId: string;
@@ -24,20 +22,16 @@ export interface Chunk {
   embedding: number[];
 }
 
-// ── SAFE DECODE ────────────────────────────────────────────────────────────
-// pdf2json URI-encodes text but some PDFs produce malformed sequences
 function safeDecode(str: string): string {
   try {
     return decodeURIComponent(str);
   } catch {
-    // Fall back: decode only safe percent-sequences, leave the rest as-is
     return str.replace(/%[0-9A-Fa-f]{2}/g, (seq) => {
       try { return decodeURIComponent(seq); } catch { return ''; }
     });
   }
 }
 
-// ── TEXT SPLITTER ──────────────────────────────────────────────────────────
 function splitIntoChunks(
   text: string,
   sourceId: string,
@@ -64,12 +58,10 @@ function splitIntoChunks(
   return chunks;
 }
 
-// ── TXT EXTRACTOR ──────────────────────────────────────────────────────────
 function extractTxt(filePath: string): string {
   return fs.readFileSync(filePath, 'utf-8');
 }
 
-// ── PDF EXTRACTOR (pdf2json) ───────────────────────────────────────────────
 async function extractPDF(filePath: string): Promise<{ text: string; pageCount: number }> {
   return new Promise((resolve, reject) => {
     const parser = new PDFParser(null, 1);
@@ -86,7 +78,7 @@ async function extractPDF(filePath: string): Promise<{ text: string; pageCount: 
         const pageText = (page.Texts ?? [])
           .map((t: any) =>
             (t.R ?? [])
-              .map((r: any) => safeDecode(r.T ?? ''))  // ← safe decode here
+              .map((r: any) => safeDecode(r.T ?? ''))  
               .join('')
           )
           .join(' ');
@@ -100,7 +92,6 @@ async function extractPDF(filePath: string): Promise<{ text: string; pageCount: 
   });
 }
 
-// ── OCR EXTRACTOR for image-based PDFs ────────────────────────────────────
 async function extractPDFWithOCR(filePath: string, pageCount: number): Promise<string> {
   if (!fs.existsSync(TMP_IMAGE_DIR)) {
     fs.mkdirSync(TMP_IMAGE_DIR, { recursive: true });
@@ -145,7 +136,6 @@ async function extractPDFWithOCR(filePath: string, pageCount: number): Promise<s
   return fullText;
 }
 
-// ── HYBRID PDF EXTRACTOR ───────────────────────────────────────────────────
 async function extractPDFHybrid(filePath: string, forceOCR: boolean): Promise<string> {
   const { text, pageCount } = await extractPDF(filePath);
 
@@ -162,7 +152,6 @@ async function extractPDFHybrid(filePath: string, forceOCR: boolean): Promise<st
   return text;
 }
 
-// ── MAIN ───────────────────────────────────────────────────────────────────
 async function main() {
   console.log('APF Knowledge Base Ingestion\n');
 
@@ -171,7 +160,6 @@ async function main() {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  // Suppress the noisy pdf2json warnings about fake workers and unsupported fields
   const originalWarn = console.warn;
   console.warn = (...args: any[]) => {
     const msg = String(args[0] ?? '');
@@ -239,7 +227,6 @@ async function main() {
     successCount++;
   }
 
-  // Restore console.warn
   console.warn = originalWarn;
 
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(allChunks, null, 2));

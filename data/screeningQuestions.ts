@@ -111,7 +111,7 @@ export const PREGNANCY_SCREENING_QUESTIONS: ScreeningQuestion[] = [
   },
 ];
 
-// ── POSTNATAL SCREENING ( from: International Delphi study of clinical and exercise professionals)
+//POSTNATAL SCREENING ( from: International Delphi study of clinical and exercise professionals)
 
 export const POSTNATAL_SCREENING_QUESTIONS: ScreeningQuestion[] = [
   {

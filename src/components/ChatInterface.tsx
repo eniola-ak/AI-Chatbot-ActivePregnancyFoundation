@@ -106,7 +106,6 @@ const YesNoButtons: React.FC<{
   </div>
 );
 
-// ── CATEGORY QUICK REPLIES ─────────────────────────────────────────────────
 const QuickReplies: React.FC<{ options: QuickReply[]; onSelect: (v: string) => void }> = ({
   options,
   onSelect,
@@ -124,7 +123,6 @@ const QuickReplies: React.FC<{ options: QuickReply[]; onSelect: (v: string) => v
   </div>
 );
 
-// ── MAIN COMPONENT ─────────────────────────────────────────────────────────
 export const ChatInterface: React.FC = () => {
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>('ask_name');
   const [userProfile, setUserProfile] = useState<UserProfile>({
@@ -203,7 +201,6 @@ export const ChatInterface: React.FC = () => {
       const termToExplain = question.explainTerm;
 
       if (termToExplain) {
-        // Find glossary entry for this specific term
         const glossaryEntry = findMedicalTerm(termToExplain);
 
         if (glossaryEntry) {
@@ -228,14 +225,12 @@ export const ChatInterface: React.FC = () => {
             ));
           }
         } else {
-          // Term not in glossary — show generic
           addMessage(nancyMsg(
             `No worries! It might be worth checking with your GP or midwife to find out more about "${termToExplain}". Does this apply to you?`,
             { showYesNo: true, explainLabel: undefined }
           ));
         }
       } else {
-        // No explainTerm on this question
         addMessage(nancyMsg(
           `No worries! It might be worth checking with your GP or midwife to find out. Does this apply to you?`,
           { showYesNo: true, explainLabel: undefined }
@@ -256,7 +251,6 @@ export const ChatInterface: React.FC = () => {
 
     const nextIndex = currentIndex + 1;
 
-    // ── YES + refer_and_continue → flag and move on ───────────────────────
     if (isYes && question.yesAction === 'refer_and_continue') {
       setUserProfile(prev => ({ ...prev, screeningFlaggedYes: true }));
 
@@ -289,7 +283,6 @@ export const ChatInterface: React.FC = () => {
     }, 400);
   }, [addMessage, finishScreening]);
 
-  // ── CATEGORY SELECT ──────────────────────────────────────────────────────
   const handleCategorySelect = useCallback((value: string, name: string) => {
     const category = value as NonNullable<UserCategory>;
     const label = CATEGORY_OPTIONS.find(o => o.value === value)?.label ?? value;
@@ -322,7 +315,6 @@ export const ChatInterface: React.FC = () => {
         return;
       }
 
-      // Pregnant or postnatal → start screening
       const questions =
         category === 'pregnant'
           ? PREGNANCY_SCREENING_QUESTIONS
@@ -340,13 +332,11 @@ export const ChatInterface: React.FC = () => {
     [addMessage]
   );
 
-  // ── TEXT INPUT SEND HANDLER ──────────────────────────────────────────────
   const handleSend = async () => {
     const trimmed = input.trim();
     if (!trimmed || isLoading) return;
     setInput('');
 
-    // Step 1: collect name
     if (onboardingStep === 'ask_name') {
       const raw = trimmed
         .replace(/^(i'?m|my name is|call me|i am)\s+/i, '')

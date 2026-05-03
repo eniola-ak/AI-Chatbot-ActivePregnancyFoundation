@@ -3,12 +3,11 @@ export interface Source {
   type: 'pdf' | 'txt';
   location: string;
   label: string;
-  hasImages?: boolean; //A true value triggers OCR 
+  hasImages?: boolean;
 }
 
 export const SOURCES: Source[] = [
 
-  //TXT FILES 
   {
     id: 'src-txt-001',
     type: 'txt',
@@ -46,7 +45,6 @@ export const SOURCES: Source[] = [
     label: 'APF Pregnancy FAQs',
   },
 
-  // APF ACTIVITY GUIDES 
   {
     id: 'src-pdf-001',
     type: 'pdf',
@@ -125,7 +123,6 @@ export const SOURCES: Source[] = [
     hasImages: false,
   },
 
-  // APF ORGANISATIONAL DOCS 
   {
     id: 'src-pdf-012',
     type: 'pdf',
@@ -141,7 +138,6 @@ export const SOURCES: Source[] = [
     hasImages: false,
   },
 
-  //CLINICAL GUIDELINES & RESEARCH
   {
     id: 'src-pdf-014',
     type: 'pdf',
@@ -178,7 +174,6 @@ export const SOURCES: Source[] = [
     hasImages: false,
   },
 
-  //UK CMO PHYSICAL ACTIVITY GUIDELINES 
   {
     id: 'src-pdf-019',
     type: 'pdf',
@@ -201,7 +196,6 @@ export const SOURCES: Source[] = [
     hasImages: false,
   },
 
-  // POSTNATAL & INFOGRAPHICS 
   {
     id: 'src-pdf-022',
     type: 'pdf',
@@ -231,16 +225,14 @@ export const SOURCES: Source[] = [
     hasImages: true,
   },
 
-  // SOCIAL MEDIA
   {
     id: 'src-pdf-026',
     type: 'pdf',
     location: './data/pdfs/TMM_Social Media Resource Pack_Jan 2023.pdf',
     label: 'This Mum Moves: Social Media Resource Pack (Jan 2023)',
-    hasImages: true, // ← resource pack likely image-heavy
+    hasImages: true, 
   },
-
-  // NEWLY ADDED SOURCES
+  
   { 
   id: 'nancy-preconception', 
   label: 'APF Preconception Resources', 

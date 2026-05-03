@@ -1,5 +1,4 @@
 /// <reference types="vite/client" />
-// src/services/geminiService.ts
 import { GoogleGenAI } from "@google/genai";
 import { retrieveContext } from "./ragService";
 import { shouldReferToGP, getGPReferralResponse } from '../constants/medicalDictionary';
@@ -82,7 +81,6 @@ STRICT RULES:
 `.trim();
 }
  
-// ── TRY A SINGLE MODEL ─────────────────────────────────────────────────────
 async function tryModel(
   ai: GoogleGenAI,
   model: string,
@@ -130,11 +128,9 @@ Explain medical terms in plain English using only the definition provided. Keep 
     try {
       return await tryModel(ai, model, contents, systemInstruction);
     } catch {
-      // try next model
     }
   }
  
-  // Hard fallback — return raw definition
   return `No worries! **${term}** means: ${definition} _(Source: ${source})_`;
 }
 
@@ -173,16 +169,13 @@ export const getGeminiResponse = async (
   }));
  
   const systemInstruction = buildSystemInstruction(userName, category);
- 
-  // ── FALLBACK CHAIN ───────────────────────────────────────────────────────
-  // Try each model in order. Move to the next if one fails.
+
   const errors: string[] = [];
  
   for (const model of MODEL_CHAIN) {
     try {
       console.log(`Trying model: ${model}`);
       const text = await tryModel(ai, model, contents, systemInstruction);
-      // Log which model was actually used if it wasn't the first choice
       if (model !== MODEL_CHAIN[0]) {
         console.warn(`Fell back to model: ${model}`);
       }
@@ -191,11 +184,9 @@ export const getGeminiResponse = async (
       const message = err instanceof Error ? err.message : String(err);
       errors.push(`${model}: ${message}`);
       console.warn(`Model ${model} failed — ${message}`);
-      // Continue to next model
     }
   }
  
-  // All models failed
   console.error('All models failed:\n' + errors.join('\n'));
   return "I'm having trouble connecting right now. Please try again in a moment, or contact the APF team directly if the problem persists.";
 };
