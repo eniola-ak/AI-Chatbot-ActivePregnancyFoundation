@@ -1,5 +1,4 @@
 /// <reference types="vite/client" />
-// src/services/geminiService.ts
 import { GoogleGenAI } from "@google/genai";
 import { retrieveContext } from "./ragService";
 import { shouldReferToGP, getGPReferralResponse } from '../constants/medicalDictionary';
@@ -78,10 +77,10 @@ STRICT RULES:
 5. If a user reports a YES to any screening question, clearly advise them to speak to their GP or midwife before resuming physical activity.
 6. Cite your source at the end of each answer in parentheses, e.g. (Source: APF General FAQs).
 7. Never diagnose conditions or prescribe specific treatments.
+8. NEVER use the word "No" as a direct response to a user's question. Instead of refusing or negating, offer a softer alternative. For example, use phrases like "That's not something I can help with directly, but...", "I'd suggest checking with your midwife or GP about that", or "It's best to approach that carefully. Here's what I can share...". Always redirect warmly rather than shutting the conversation down.
 `.trim();
 }
  
-// ── TRY A SINGLE MODEL ─────────────────────────────────────────────────────
 async function tryModel(
   ai: GoogleGenAI,
   model: string,
@@ -101,8 +100,40 @@ async function tryModel(
   if (!text) throw new Error(`${model} returned empty response`);
   return text;
 }
+
+export async function explainMedicalTerm(
+  term: string,
+  definition: string,
+  source: string,
+  userName: string = ''
+): Promise<string> {
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' });
  
-// ── MAIN EXPORT ────────────────────────────────────────────────────────────
+  const prompt = `The user selected "Not sure" when asked about "${term}" in a pregnancy health screening.
+ 
+Definition from ${source}: "${definition}"
+ 
+Please explain what "${term}" means in 1-2 warm, friendly sentences using ONLY this definition.
+Use plain English — like a knowledgeable friend explaining something.
+${userName ? `Address the user as ${userName}.` : ''}
+Do NOT add medical advice. Do NOT suggest treatments. Keep it under 3 sentences total.
+At the end of your explanation, always add: (Source: ${source})`;
+ 
+  const systemInstruction = `You are Nancy, a warm friendly assistant from the Active Pregnancy Foundation.
+Explain medical terms in plain English using only the definition provided. Keep responses short and warm.`;
+ 
+  const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+ 
+  for (const model of MODEL_CHAIN) {
+    try {
+      return await tryModel(ai, model, contents, systemInstruction);
+    } catch {
+    }
+  }
+ 
+  return `No worries! **${term}** means: ${definition} _(Source: ${source})_`;
+}
+
 export const getGeminiResponse = async (
   history: ChatMessage[],
   userName: string = '',
@@ -138,16 +169,13 @@ export const getGeminiResponse = async (
   }));
  
   const systemInstruction = buildSystemInstruction(userName, category);
- 
-  // ── FALLBACK CHAIN ───────────────────────────────────────────────────────
-  // Try each model in order. Move to the next if one fails.
+
   const errors: string[] = [];
  
   for (const model of MODEL_CHAIN) {
     try {
       console.log(`Trying model: ${model}`);
       const text = await tryModel(ai, model, contents, systemInstruction);
-      // Log which model was actually used if it wasn't the first choice
       if (model !== MODEL_CHAIN[0]) {
         console.warn(`Fell back to model: ${model}`);
       }
@@ -156,11 +184,9 @@ export const getGeminiResponse = async (
       const message = err instanceof Error ? err.message : String(err);
       errors.push(`${model}: ${message}`);
       console.warn(`Model ${model} failed — ${message}`);
-      // Continue to next model
     }
   }
  
-  // All models failed
   console.error('All models failed:\n' + errors.join('\n'));
   return "I'm having trouble connecting right now. Please try again in a moment, or contact the APF team directly if the problem persists.";
 };

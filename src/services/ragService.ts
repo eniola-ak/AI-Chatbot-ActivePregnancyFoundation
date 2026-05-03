@@ -18,11 +18,7 @@ export interface RetrievedContext {
 
 export async function retrieveContext(query: string, topK = 8): Promise<RetrievedContext[]> {
   const allChunks = await getChunks();
-
-  // Strip common words that don't help matching
   const stopWords = new Set(['what', 'when', 'where', 'which', 'while', 'that', 'this', 'with', 'from', 'they', 'them', 'have', 'will', 'your', 'about', 'can', 'the', 'and', 'for', 'are', 'was', 'its']);
-
-  // Break query into root stems (e.g. "running" → "run", "pregnant" → "pregnan")
   const queryWords = query
     .toLowerCase()
     .replace(/[^a-z\s]/g, '')
@@ -43,7 +39,6 @@ export async function retrieveContext(query: string, topK = 8): Promise<Retrieve
       let score = 0;
 
       for (const word of queryWords) {
-        // Label matches — weighted heavily so e.g. "yoga" always surfaces yoga chunks first
         if (label.includes(word)) {
           score += 10;
         }
